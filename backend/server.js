@@ -3,6 +3,7 @@ import mysql from "mysql2";
 import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
+import { v4 as uuidv4 } from "uuid";
 
 // ------------------ Setup __dirname ------------------
 const __filename = fileURLToPath(import.meta.url);
@@ -18,7 +19,7 @@ app.use(express.static(path.join(__dirname, "../frontend/public")));
 const db = mysql.createConnection({
   host: "localhost",
   user: "root",
-  password: "",
+  password: "", // ✅ no password (since you confirmed)
   database: "task6",
 });
 
@@ -96,6 +97,33 @@ app.put("/api/buyers/:id", (req, res) => {
   db.query(sql, [name, email, phone, location, notes, req.params.id], (err) => {
     if (err) return res.status(500).json({ ok: false, error: err.message });
     res.json({ ok: true, message: "Buyer updated successfully" });
+  });
+});
+
+// ------------------ BILL GENERATION API (Task 7) ------------------
+app.get("/api/bill/:buyerId", (req, res) => {
+  const buyerId = req.params.buyerId;
+  const sqlBuyer = "SELECT * FROM buyers WHERE id = ?";
+  const sqlProducts = "SELECT * FROM products ORDER BY id LIMIT 3"; // pick first 3 products
+
+  db.query(sqlBuyer, [buyerId], (err, buyerRows) => {
+    if (err) return res.status(500).json({ ok: false, error: err.message });
+    if (!buyerRows.length) return res.status(404).json({ ok: false, error: "Buyer not found" });
+
+    db.query(sqlProducts, (err, productRows) => {
+      if (err) return res.status(500).json({ ok: false, error: err.message });
+
+      const transactionId = uuidv4().slice(0, 8).toUpperCase();
+      const date = new Date().toLocaleDateString("en-IN");
+      const payment = "UPI";
+
+      res.json({
+        ok: true,
+        buyer: buyerRows[0],
+        products: productRows,
+        transaction: { id: transactionId, date, payment },
+      });
+    });
   });
 });
 
